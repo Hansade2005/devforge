@@ -1,0 +1,31 @@
+.chat-url-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 4px 0;
+    font-size: 12px;
+}
+
+.chat-url-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background-color: var(--vscode-chatInputBackground);
+    border: 1px solid var(--vscode-chatInputBorder);
+    cursor: pointer;
+    user-select: none;
+}
+
+.chat-url-tag:hover {
+    background-color: var(--vscode-chatInputHoverBackground);
+}
+
+.chat-url-tag.pending {
+    font-style: italic;
+    opacity: 0.8;
+}
+
+.chat-url-tag:active {
+    transform: scale(0.98);
+}
