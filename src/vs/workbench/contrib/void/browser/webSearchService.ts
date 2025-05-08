@@ -6,7 +6,7 @@
 import { registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
 import puppeteer from 'puppeteer';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 export interface IWebSearchService {
     readonly _serviceBrand: undefined;

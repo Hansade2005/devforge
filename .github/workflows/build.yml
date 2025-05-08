@@ -36,16 +36,24 @@ jobs:
           npm install
           npm install -g node-gyp
           npm install -g gulp-cli
+      - name: Install type definitions for TypeScript
+        run: |
+          npm install --save-dev @types/mocha @types/node @types/semver @types/sinon @types/trusted-types @types/winreg @webgpu/types @types/wicg-file-system-access || true
+        shell: pwsh
       - name: Build
         continue-on-error: true
+        shell: pwsh
         run: |
           npm run buildreact
           # Clean build directories first
-          gulp clean-out-build || true
+          gulp clean-out-build
+          if ($LASTEXITCODE -ne 0) { Write-Host "Clean failed but continuing..."; $LASTEXITCODE = 0 }
           # Disable mangling to avoid node_modules issues
-          gulp compile-build-without-mangling || (echo "Compilation failed but continuing..." && exit 0)
+          gulp compile-build-without-mangling
+          if ($LASTEXITCODE -ne 0) { Write-Host "Compilation failed but continuing..."; $LASTEXITCODE = 0 }
           # Continue with minification even if compilation had warnings
-          gulp vscode-win32-x64-min || (echo "Minification failed but continuing..." && exit 0)
+          gulp vscode-win32-x64-min
+          if ($LASTEXITCODE -ne 0) { Write-Host "Minification failed but continuing..."; $LASTEXITCODE = 0 }
       - name: Package
         run: |
           mkdir -p .build/win32-x64
@@ -94,16 +102,24 @@ jobs:
           npm install
           npm install -g node-gyp
           npm install -g gulp-cli
+      - name: Install type definitions for TypeScript
+        run: |
+          npm install --save-dev @types/mocha @types/node @types/semver @types/sinon @types/trusted-types @types/winreg @webgpu/types @types/wicg-file-system-access || true
+        shell: pwsh
       - name: Build
         continue-on-error: true
+        shell: pwsh
         run: |
           npm run buildreact
           # Clean build directories first
-          gulp clean-out-build || true
+          gulp clean-out-build
+          if ($LASTEXITCODE -ne 0) { Write-Host "Clean failed but continuing..."; $LASTEXITCODE = 0 }
           # Disable mangling to avoid node_modules issues
-          gulp compile-build-without-mangling || (echo "Compilation failed but continuing..." && exit 0)
+          gulp compile-build-without-mangling
+          if ($LASTEXITCODE -ne 0) { Write-Host "Compilation failed but continuing..."; $LASTEXITCODE = 0 }
           # Continue with minification even if compilation had warnings
-          gulp vscode-win32-arm64-min || (echo "Minification failed but continuing..." && exit 0)
+          gulp vscode-win32-arm64-min
+          if ($LASTEXITCODE -ne 0) { Write-Host "Minification failed but continuing..."; $LASTEXITCODE = 0 }
       - name: Package
         run: |
           mkdir -p .build/win32-arm64

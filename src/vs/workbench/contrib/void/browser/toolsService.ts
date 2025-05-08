@@ -283,55 +283,19 @@ export class ToolsService implements IToolsService {
 				return { persistentTerminalId };
 			},
 
-			find_symbol: async ({ query }) => {
-				// Use the workspace symbol provider (LSP or similar)
-				const symbolProvider = (window as any).acquireVsCodeApi?.()?.workspace?.getWorkspaceSymbols;
-				if (symbolProvider) {
-					const results = await symbolProvider(query);
-					return {
-						result: results.map((s: any) => ({
-							name: s.name,
-							kind: s.kind,
-							file: s.location?.uri?.fsPath || s.location?.uri?.path || '',
-							line: s.location?.range?.start?.line || 0,
-							column: s.location?.range?.start?.character || 0
-						}))
-					};
-				}
-				throw new Error('Workspace symbol provider not available.');
+			find_symbol: (params: RawToolParamsObj) => {
+				const query = validateStr('query', params.query);
+				return { query };
 			},
 
-			list_symbols_in_file: async ({ uri }) => {
-				// Use the document symbol provider (LSP or similar)
-				const symbolProvider = (window as any).acquireVsCodeApi?.()?.workspace?.getDocumentSymbols;
-				if (symbolProvider) {
-					const results = await symbolProvider(uri.fsPath);
-					return {
-						result: results.map((s: any) => ({
-							name: s.name,
-							kind: s.kind,
-							line: s.range?.start?.line || 0,
-							column: s.range?.start?.character || 0
-						}))
-					};
-				}
-				throw new Error('Document symbol provider not available.');
+			list_symbols_in_file: (params: RawToolParamsObj) => {
+				const uri = validateURI(params.uri);
+				return { uri };
 			},
 
-			run_linter: async ({ target }) => {
-				// Use Node child_process to run ESLint
-				return new Promise((resolve, reject) => {
-					const { exec } = require('child_process');
-					exec(`npx eslint "${target}" -f json`, (err: any, stdout: string, stderr: string) => {
-						if (err && !stdout) return reject(stderr);
-						try {
-							const results = JSON.parse(stdout);
-							resolve({ result: results });
-						} catch {
-							resolve({ result: stdout || stderr });
-						}
-					});
-				});
+			run_linter: (params: RawToolParamsObj) => {
+				const target = validateStr('target', params.target);
+				return { target };
 			},
 
 		}
@@ -554,7 +518,7 @@ export class ToolsService implements IToolsService {
 				// Use Node child_process to run ESLint
 				return new Promise((resolve, reject) => {
 					const { exec } = require('child_process');
-					exec(`npx eslint "${target}" -f json`, (err: any, stdout: string, stderr: string) => {
+					exec(`npx eslint "${target}" -f json`, (err, stdout, stderr) => {
 						if (err && !stdout) return reject(stderr);
 						try {
 							const results = JSON.parse(stdout);
