@@ -48,7 +48,7 @@ jobs:
       - name: Build
         shell: pwsh
         env:
-          STRICT_NODE_MODULES_SKIP: true # Force strict skipping of node_modules during mangling
+          STRICT_NODE_MODULES_SKIP: true # Force strict skipping of node_modules during mangling to prevent mangling errors
         run: |
           npm run buildreact
           # Clean build directories first
