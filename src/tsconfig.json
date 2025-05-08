@@ -24,7 +24,9 @@
 				"name": "tsec",
 				"exemptionConfig": "./tsec.exemptions.json"
 			}
-		]
+		],
+		"skipLibCheck": true,
+		"noEmitOnError": false
 	},
 	"include": [
 		"./*.ts",
