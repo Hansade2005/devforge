@@ -428,7 +428,7 @@ export class Mangler {
 		// Check for strict node_modules skip flag from environment
 		const strictNodeModulesSkip = process.env.STRICT_NODE_MODULES_SKIP === 'true';
 		if (strictNodeModulesSkip) {
-			this.log('STRICT_NODE_MODULES_SKIP is enabled - will completely exclude all node_modules files');
+			this.log('STRICT_NODE_MODULES_SKIP is enabled - will completely exclude all node_modules files completely');
 		}
 
 		this.renameWorkerPool = workerpool.pool(path.join(__dirname, 'renameWorker.js'), {
@@ -594,7 +594,7 @@ export class Mangler {
 			}
 			ts.forEachChild(file, visit);
 		}
-		this.log(`Done collecting. Classes: ${this.allClassDataByKey.size}. Exported symbols: ${this.allExportedSymbols.size}`);
+		this.log(`Done collecting all classes. Classes: ${this.allClassDataByKey.size}. Exported symbols: ${this.allExportedSymbols.size}`);
 
 
 		//  STEP: connect sub and super-types
