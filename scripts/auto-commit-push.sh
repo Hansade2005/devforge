@@ -26,9 +26,6 @@ if [ -z "$(git status --porcelain)" ]; then
     exit 0
 fi
 
-# Get current branch name
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "master")
-
 # Get commit message from argument or prompt for it
 COMMIT_MESSAGE="$1"
 if [ -z "$COMMIT_MESSAGE" ]; then
@@ -54,14 +51,30 @@ fi
 echo "Committing changes with message: $COMMIT_MESSAGE"
 git commit -m "$COMMIT_MESSAGE"
 
-# Push to remote if origin exists
-if git remote get-url origin >/dev/null 2>&1; then
-    echo "Pushing to remote origin..."
-    git push origin "$CURRENT_BRANCH"
+# Switch to main branch
+echo "Switching to main branch..."
+git branch -M main
+
+# Configure remote if not already set
+if ! git config remote.origin.url > /dev/null; then
+    echo "Setting up remote repository..."
+    git remote add origin https://github.com/Hansade2005/devforge.git
+elif [ "$(git config remote.origin.url)" != "https://github.com/Hansade2005/devforge.git" ]; then
+    echo "Updating remote repository URL..."
+    git remote set-url origin https://github.com/Hansade2005/devforge.git
+fi
+
+# Push to remote
+echo "Pushing to remote origin..."
+if git push -u origin main; then
+    echo "Push successful!"
 else
-    echo "No remote 'origin' configured. Skipping push."
-    echo "To push later, add a remote with: git remote add origin <repository-url>"
-    echo "Then push with: git push -u origin $CURRENT_BRANCH"
+    echo "Push failed. You may need to:"
+    echo "1. Ensure you have write access to the repository"
+    echo "2. Configure your Git credentials"
+    echo "3. Use GitHub CLI: gh auth login"
+    echo "4. Or manually push using: git push -u origin main"
+    exit 1
 fi
 
 echo "======== Done ========"
