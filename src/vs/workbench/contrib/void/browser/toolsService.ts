@@ -524,7 +524,7 @@ export class ToolsService implements IToolsService {
 						if (err && !stdout) return reject(new Error(stderr));
 						try {
 							const results = JSON.parse(stdout);
-							return resolve({ result: { lintResults: results } });
+							return resolve({ result: results });
 						} catch {
 							reject(new Error('Failed to parse ESLint output'));
 						}

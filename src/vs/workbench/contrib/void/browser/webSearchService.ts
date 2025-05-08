@@ -36,7 +36,7 @@ class WebSearchService implements IWebSearchService {
             const urls = searchData.items.slice(0, 10).map((item: any) => item.link);
 
             // Launch puppeteer
-            const browser = await puppeteer.launch({ headless: true });
+            const browser = await puppeteer.launch({ headless: "shell" });
             const contexts: string[] = [];
 
             // Visit each URL and extract content
@@ -78,4 +78,4 @@ class WebSearchService implements IWebSearchService {
     }
 }
 
-registerSingleton(IWebSearchService, WebSearchService, InstantiationType.Delayed as InstantiationType);
+registerSingleton(IWebSearchService, WebSearchService, InstantiationType.Delayed);
