@@ -1,7 +1,7 @@
 {
 	"nameShort": "DevForge",
 	"nameLong": "DevForge",
-	"voidVersion": "1.3.2",
+	"voidVersion": "1.0.0",
 	"applicationName": "devforge",
 	"dataFolderName": ".devforge",
 	"win32MutexName": "devforge",
