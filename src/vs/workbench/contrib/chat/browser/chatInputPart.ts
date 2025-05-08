@@ -819,11 +819,12 @@ export class ChatInputPart extends Disposable implements IHistoryNavigationWidge
 
 	private renderUrlTags() {
 		const urlTagsContainer = (this.container.querySelector('.chat-url-tags') as HTMLElement) ||
-			dom.append(this.attachmentsContainer, dom.$('.chat-url-tags'));
-		dom.clearNode(urlTagsContainer as HTMLElement);
+			(dom.append(this.attachmentsContainer, dom.$('.chat-url-tags')) as HTMLElement);
+		dom.clearNode(urlTagsContainer);
 
 		for (const [url, data] of this.detectedUrls) {
-			const tag = dom.append(urlTagsContainer as HTMLElement, dom.$('.chat-url-tag')) as HTMLElement;
+			const urlTagElement = dom.$('.chat-url-tag');
+			const tag = dom.append(urlTagsContainer, urlTagElement) as HTMLElement;
 			const urlText = url.length > 30 ? url.slice(0, 27) + '...' : url;
 
 			let statusIcon = '';

@@ -57,7 +57,16 @@ jobs:
       - name: Package
         run: |
           mkdir -p .build/win32-x64
-          Compress-Archive -Path ..\VSCode-win32-x64\* -DestinationPath .build\win32-x64\devforge-win32-x64.zip
+          # First check if VSCode build exists in the .build directory
+          if (Test-Path ".build\VSCode-win32-x64") {
+            $sourcePath = ".build\VSCode-win32-x64\*"
+          } elseif (Test-Path "..\VSCode-win32-x64") {
+            $sourcePath = "..\VSCode-win32-x64\*"
+          } else {
+            Write-Error "Could not find VSCode build output directory"
+            exit 1
+          }
+          Compress-Archive -Path $sourcePath -DestinationPath .build\win32-x64\devforge-win32-x64.zip
         shell: pwsh
 
       - name: Generate checksum
@@ -123,7 +132,16 @@ jobs:
       - name: Package
         run: |
           mkdir -p .build/win32-arm64
-          Compress-Archive -Path ..\VSCode-win32-arm64\* -DestinationPath .build\win32-arm64\devforge-win32-arm64.zip
+          # First check if VSCode build exists in the .build directory
+          if (Test-Path ".build\VSCode-win32-arm64") {
+            $sourcePath = ".build\VSCode-win32-arm64\*"
+          } elseif (Test-Path "..\VSCode-win32-arm64") {
+            $sourcePath = "..\VSCode-win32-arm64\*"
+          } else {
+            Write-Error "Could not find VSCode build output directory"
+            exit 1
+          }
+          Compress-Archive -Path $sourcePath -DestinationPath .build\win32-arm64\devforge-win32-arm64.zip
         shell: pwsh
 
       - name: Generate checksum
