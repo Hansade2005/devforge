@@ -517,14 +517,16 @@ export class ToolsService implements IToolsService {
 			run_linter: async ({ target }) => {
 				// Use Node child_process to run ESLint
 				return new Promise((resolve, reject) => {
-					const { exec, ExecException } = require('child_process');
-					exec(`npx eslint "${target}" -f json`, (err: ExecException | null, stdout: string, stderr: string) => {
-						if (err && !stdout) return reject(stderr);
+					const { exec } = require('child_process');
+					type ExecError = { code: number; message: string; };
+
+					exec(`npx eslint "${target}" -f json`, (err: ExecError | null, stdout: string, stderr: string) => {
+						if (err && !stdout) return reject(new Error(stderr));
 						try {
 							const results = JSON.parse(stdout);
-							resolve({ result: results });
+							resolve({ result: { lintResults: results } });
 						} catch {
-							resolve({ result: stdout || stderr });
+							reject(new Error('Failed to parse ESLint output'));
 						}
 					});
 				});

@@ -41,19 +41,20 @@ jobs:
           npm install --save-dev @types/mocha @types/node @types/semver @types/sinon @types/trusted-types @types/winreg @webgpu/types @types/wicg-file-system-access || true
         shell: pwsh
       - name: Build
-        continue-on-error: true
         shell: pwsh
         run: |
           npm run buildreact
           # Clean build directories first
           gulp clean-out-build
-          if ($LASTEXITCODE -ne 0) { Write-Host "Clean failed but continuing..."; $LASTEXITCODE = 0 }
-          # Disable mangling to avoid node_modules issues
+          # Compile without mangling
           gulp compile-build-without-mangling
-          if ($LASTEXITCODE -ne 0) { Write-Host "Compilation failed but continuing..."; $LASTEXITCODE = 0 }
-          # Continue with minification even if compilation had warnings
+          # Bundle and minify for Windows x64
+          gulp minify-vscode
           gulp vscode-win32-x64-min
-          if ($LASTEXITCODE -ne 0) { Write-Host "Minification failed but continuing..."; $LASTEXITCODE = 0 }
+          # Ensure build output directory exists
+          New-Item -ItemType Directory -Force -Path ..\VSCode-win32-x64
+          # Copy build output to expected location
+          Copy-Item -Path "out-vscode-min\*" -Destination "..\VSCode-win32-x64" -Recurse -Force
       - name: Package
         run: |
           mkdir -p .build/win32-x64
@@ -116,19 +117,20 @@ jobs:
           npm install --save-dev @types/mocha @types/node @types/semver @types/sinon @types/trusted-types @types/winreg @webgpu/types @types/wicg-file-system-access || true
         shell: pwsh
       - name: Build
-        continue-on-error: true
         shell: pwsh
         run: |
           npm run buildreact
           # Clean build directories first
           gulp clean-out-build
-          if ($LASTEXITCODE -ne 0) { Write-Host "Clean failed but continuing..."; $LASTEXITCODE = 0 }
-          # Disable mangling to avoid node_modules issues
+          # Compile without mangling
           gulp compile-build-without-mangling
-          if ($LASTEXITCODE -ne 0) { Write-Host "Compilation failed but continuing..."; $LASTEXITCODE = 0 }
-          # Continue with minification even if compilation had warnings
+          # Bundle and minify for Windows ARM64
+          gulp minify-vscode
           gulp vscode-win32-arm64-min
-          if ($LASTEXITCODE -ne 0) { Write-Host "Minification failed but continuing..."; $LASTEXITCODE = 0 }
+          # Ensure build output directory exists
+          New-Item -ItemType Directory -Force -Path ..\VSCode-win32-arm64
+          # Copy build output to expected location
+          Copy-Item -Path "out-vscode-min\*" -Destination "..\VSCode-win32-arm64" -Recurse -Force
       - name: Package
         run: |
           mkdir -p .build/win32-arm64

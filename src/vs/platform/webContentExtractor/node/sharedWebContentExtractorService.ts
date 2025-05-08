@@ -11,6 +11,25 @@ import { ISharedWebContentExtractorService } from '../common/webContentExtractor
 export class SharedWebContentExtractorService implements ISharedWebContentExtractorService {
 	_serviceBrand: undefined;
 
+	async extract(options: { uri: URI }, token: CancellationToken): Promise<{ content: string } | undefined> {
+		if (token.isCancellationRequested) {
+			return undefined;
+		}
+
+		try {
+			const response = await fetch(options.uri.toString(true));
+			if (!response.ok) {
+				return undefined;
+			}
+
+			const content = await response.text();
+			return { content };
+		} catch (err) {
+			console.log(err);
+			return undefined;
+		}
+	}
+
 	async readImage(uri: URI, token: CancellationToken): Promise<VSBuffer | undefined> {
 		if (token.isCancellationRequested) {
 			return undefined;
