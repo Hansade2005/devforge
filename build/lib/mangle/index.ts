@@ -291,6 +291,10 @@ function isNameTakenInFile(node: ts.Node, name: string): boolean {
 	return false;
 }
 
+// Constants for path filtering
+const NODE_MODULES_PATTERN = /node_modules/;
+const D_TS_PATTERN = /\.d\.ts$/;
+
 const skippedExportMangledFiles = [
 	// Build
 	'css.build',
@@ -421,6 +425,11 @@ export class Mangler {
 		private readonly log: typeof console.log = () => { },
 		private readonly config: { readonly manglePrivateFields: boolean; readonly mangleExports: boolean },
 	) {
+		// Check for strict node_modules skip flag from environment
+		const strictNodeModulesSkip = process.env.STRICT_NODE_MODULES_SKIP === 'true';
+		if (strictNodeModulesSkip) {
+			this.log('STRICT_NODE_MODULES_SKIP is enabled - will completely exclude all node_modules files');
+		}
 
 		this.renameWorkerPool = workerpool.pool(path.join(__dirname, 'renameWorker.js'), {
 			maxWorkers: 4,
@@ -519,6 +528,11 @@ export class Mangler {
 		const fileIdents = new ShortIdent('$');
 
 		const visit = (node: ts.Node): void => {
+			// Skip processing any files in node_modules, especially .d.ts files
+			if (node.getSourceFile().fileName.includes('node_modules')) {
+				return;
+			}
+
 			if (this.config.manglePrivateFields) {
 				if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
 					const anchor = node.name ?? node;
@@ -574,9 +588,11 @@ export class Mangler {
 		};
 
 		for (const file of service.getProgram()!.getSourceFiles()) {
-			if (!file.isDeclarationFile) {
-				ts.forEachChild(file, visit);
+			// Skip any files in node_modules or declaration files
+			if (file.isDeclarationFile || NODE_MODULES_PATTERN.test(file.fileName)) {
+				continue;
 			}
+			ts.forEachChild(file, visit);
 		}
 		this.log(`Done collecting. Classes: ${this.allClassDataByKey.size}. Exported symbols: ${this.allExportedSymbols.size}`);
 
@@ -724,7 +740,15 @@ export class Mangler {
 
 		await Promise.all(renameResults).then((result) => {
 			for (const { newName, locations } of result) {
-				for (const loc of locations) {
+				// Filter out any locations that are in node_modules
+				const filteredLocations = locations.filter(loc => !NODE_MODULES_PATTERN.test(loc.fileName));
+
+				// If we filtered out some locations, log it
+				if (filteredLocations.length !== locations.length) {
+					this.log(`Skipped ${locations.length - filteredLocations.length} rename locations in node_modules`);
+				}
+
+				for (const loc of filteredLocations) {
 					appendRename(newName, loc);
 				}
 			}

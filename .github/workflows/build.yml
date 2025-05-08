@@ -40,8 +40,15 @@ jobs:
         run: |
           npm install --save-dev @types/mocha @types/node @types/semver @types/sinon @types/trusted-types @types/winreg @webgpu/types @types/wicg-file-system-access || true
         shell: pwsh
+      - name: Build Extensions
+        shell: pwsh
+        run: |
+          # Explicitly compile extensions
+          gulp compile-extensions-build
       - name: Build
         shell: pwsh
+        env:
+          STRICT_NODE_MODULES_SKIP: true # Force strict skipping of node_modules during mangling
         run: |
           npm run buildreact
           # Clean build directories first
@@ -61,13 +68,34 @@ jobs:
           # First check if VSCode build exists in the .build directory
           if (Test-Path ".build\VSCode-win32-x64") {
             $sourcePath = ".build\VSCode-win32-x64\*"
+            Write-Host "Using build output from .build\VSCode-win32-x64"
           } elseif (Test-Path "..\VSCode-win32-x64") {
             $sourcePath = "..\VSCode-win32-x64\*"
+            Write-Host "Using build output from ..\VSCode-win32-x64"
           } else {
             Write-Error "Could not find VSCode build output directory"
             exit 1
           }
+
+          # Verify that the build output contains necessary files
+          $fileCount = (Get-ChildItem -Path ($sourcePath -replace '\*$', '') -Recurse -File | Measure-Object).Count
+          Write-Host "Found $fileCount files in the build output directory"
+
+          if ($fileCount -lt 10) {
+            Write-Warning "Very few files found in build directory. This may indicate an incomplete build."
+          }
+
+          Write-Host "Creating zip archive..."
           Compress-Archive -Path $sourcePath -DestinationPath .build\win32-x64\devforge-win32-x64.zip
+
+          # Verify the zip file was created successfully
+          if (Test-Path ".build\win32-x64\devforge-win32-x64.zip") {
+            $zipSize = (Get-Item ".build\win32-x64\devforge-win32-x64.zip").Length
+            Write-Host "Zip archive created successfully. Size: $($zipSize / 1MB) MB"
+          } else {
+            Write-Error "Failed to create zip archive"
+            exit 1
+          }
         shell: pwsh
 
       - name: Generate checksum
@@ -116,6 +144,11 @@ jobs:
         run: |
           npm install --save-dev @types/mocha @types/node @types/semver @types/sinon @types/trusted-types @types/winreg @webgpu/types @types/wicg-file-system-access || true
         shell: pwsh
+      - name: Build Extensions
+        shell: pwsh
+        run: |
+          # Explicitly compile extensions
+          gulp compile-extensions-build
       - name: Build
         shell: pwsh
         run: |
@@ -137,13 +170,34 @@ jobs:
           # First check if VSCode build exists in the .build directory
           if (Test-Path ".build\VSCode-win32-arm64") {
             $sourcePath = ".build\VSCode-win32-arm64\*"
+            Write-Host "Using build output from .build\VSCode-win32-arm64"
           } elseif (Test-Path "..\VSCode-win32-arm64") {
             $sourcePath = "..\VSCode-win32-arm64\*"
+            Write-Host "Using build output from ..\VSCode-win32-arm64"
           } else {
             Write-Error "Could not find VSCode build output directory"
             exit 1
           }
+
+          # Verify that the build output contains necessary files
+          $fileCount = (Get-ChildItem -Path ($sourcePath -replace '\*$', '') -Recurse -File | Measure-Object).Count
+          Write-Host "Found $fileCount files in the build output directory"
+
+          if ($fileCount -lt 10) {
+            Write-Warning "Very few files found in build directory. This may indicate an incomplete build."
+          }
+
+          Write-Host "Creating zip archive..."
           Compress-Archive -Path $sourcePath -DestinationPath .build\win32-arm64\devforge-win32-arm64.zip
+
+          # Verify the zip file was created successfully
+          if (Test-Path ".build\win32-arm64\devforge-win32-arm64.zip") {
+            $zipSize = (Get-Item ".build\win32-arm64\devforge-win32-arm64.zip").Length
+            Write-Host "Zip archive created successfully. Size: $($zipSize / 1MB) MB"
+          } else {
+            Write-Error "Failed to create zip archive"
+            exit 1
+          }
         shell: pwsh
 
       - name: Generate checksum
