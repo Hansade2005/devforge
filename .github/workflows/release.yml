@@ -1,8 +1,8 @@
-name: Product Build Workflow
+name: Windows Release Workflow
 
 on:
-  push:
-  pull_request:
+  release:
+    types: [created]
   workflow_dispatch:
 
 permissions:
@@ -11,7 +11,8 @@ permissions:
 jobs:
   windows-build:
     runs-on: 'windows-latest'
-    name: "Build for Windows"
+    environment: production
+    name: "Release for Windows"
     strategy:
       fail-fast: false
       matrix:
@@ -51,8 +52,15 @@ jobs:
         working-directory: ./repository
         run: npm run gulp vscode-win32-${{ matrix.arch }}-${{ matrix.target }}-setup
 
-      - name: Upload DevForge Installer
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-${{ matrix.arch }}-${{ matrix.target }}-DevForge
+          name: windows-${{ matrix.arch }}-${{ matrix.target }}-exe
           path: ${{ github.workspace }}/repository/.build/win32-${{ matrix.arch }}/${{ matrix.target }}-setup/DevForge.exe
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ github.workspace }}/repository/.build/win32-${{ matrix.arch }}/${{ matrix.target }}-setup/windows-${{ matrix.arch }}-${{ matrix.target }}.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
