@@ -3,13 +3,10 @@
  *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StaticLanguageServiceHost = void 0;
-const typescript_1 = __importDefault(require("typescript"));
-const path_1 = __importDefault(require("path"));
+const ts = require("typescript");
+const path = require("path");
 class StaticLanguageServiceHost {
     projectPath;
     _cmdLine;
@@ -17,11 +14,11 @@ class StaticLanguageServiceHost {
     constructor(projectPath) {
         this.projectPath = projectPath;
         const existingOptions = {};
-        const parsed = typescript_1.default.readConfigFile(projectPath, typescript_1.default.sys.readFile);
+        const parsed = ts.readConfigFile(projectPath, ts.sys.readFile);
         if (parsed.error) {
             throw parsed.error;
         }
-        this._cmdLine = typescript_1.default.parseJsonConfigFileContent(parsed.config, typescript_1.default.sys, path_1.default.dirname(projectPath), existingOptions);
+        this._cmdLine = ts.parseJsonConfigFileContent(parsed.config, ts.sys, path.dirname(projectPath), existingOptions);
         if (this._cmdLine.errors.length > 0) {
             throw parsed.error;
         }
@@ -41,28 +38,28 @@ class StaticLanguageServiceHost {
     getScriptSnapshot(fileName) {
         let result = this._scriptSnapshots.get(fileName);
         if (result === undefined) {
-            const content = typescript_1.default.sys.readFile(fileName);
+            const content = ts.sys.readFile(fileName);
             if (content === undefined) {
                 return undefined;
             }
-            result = typescript_1.default.ScriptSnapshot.fromString(content);
+            result = ts.ScriptSnapshot.fromString(content);
             this._scriptSnapshots.set(fileName, result);
         }
         return result;
     }
     getCurrentDirectory() {
-        return path_1.default.dirname(this.projectPath);
+        return path.dirname(this.projectPath);
     }
     getDefaultLibFileName(options) {
-        return typescript_1.default.getDefaultLibFilePath(options);
+        return ts.getDefaultLibFilePath(options);
     }
-    directoryExists = typescript_1.default.sys.directoryExists;
-    getDirectories = typescript_1.default.sys.getDirectories;
-    fileExists = typescript_1.default.sys.fileExists;
-    readFile = typescript_1.default.sys.readFile;
-    readDirectory = typescript_1.default.sys.readDirectory;
+    directoryExists = ts.sys.directoryExists;
+    getDirectories = ts.sys.getDirectories;
+    fileExists = ts.sys.fileExists;
+    readFile = ts.sys.readFile;
+    readDirectory = ts.sys.readDirectory;
     // this is necessary to make source references work.
-    realpath = typescript_1.default.sys.realpath;
+    realpath = ts.sys.realpath;
 }
 exports.StaticLanguageServiceHost = StaticLanguageServiceHost;
 //# sourceMappingURL=staticLanguageServiceHost.js.map

@@ -3,14 +3,14 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import v8 from 'node:v8';
-import fs from 'fs';
-import path from 'path';
+import * as v8 from 'node:v8';
+import * as fs from 'fs';
+import * as path from 'path';
 import { argv } from 'process';
 import { Mapping, SourceMapGenerator } from 'source-map';
-import ts from 'typescript';
+import * as ts from 'typescript';
 import { pathToFileURL } from 'url';
-import workerpool from 'workerpool';
+import * as workerpool from 'workerpool';
 import { StaticLanguageServiceHost } from './staticLanguageServiceHost';
 const buildfile = require('../../buildfile');
 
@@ -215,25 +215,13 @@ class ClassData {
 
 			return false;
 		};
-
-		// Create a short identifier generator
 		const identPool = new ShortIdent('');
 
-		// Sort fields by usage count to assign shortest names to most used fields
-		const fieldsArray = Array.from(data.fields.entries())
-			.filter(([_, info]) => ClassData._shouldMangle(info.type));
-
-		// Sort by usage count (if available) in descending order
-		fieldsArray.sort((a, b) => {
-			const countA = (a[1] as any).usageCount || 0;
-			const countB = (b[1] as any).usageCount || 0;
-			return countB - countA;
-		});
-
-		// Assign names by frequency (most frequent gets shortest names)
-		for (const [name, info] of fieldsArray) {
-			const shortName = identPool.next(isNameTaken);
-			data.replacements.set(name, shortName);
+		for (const [name, info] of data.fields) {
+			if (ClassData._shouldMangle(info.type)) {
+				const shortName = identPool.next(isNameTaken);
+				data.replacements.set(name, shortName);
+			}
 		}
 	}
 
@@ -291,10 +279,6 @@ function isNameTakenInFile(node: ts.Node, name: string): boolean {
 	return false;
 }
 
-// Constants for path filtering
-const NODE_MODULES_PATTERN = /node_modules/;
-const D_TS_PATTERN = /\.d\.ts$/;
-
 const skippedExportMangledFiles = [
 	// Build
 	'css.build',
@@ -337,10 +321,9 @@ const skippedExportMangledProjects = [
 	// These projects use webpack to dynamically rewrite imports, which messes up our mangling
 	'configuration-editing',
 	'microsoft-authentication',
+	'flexpilot',
 	'github-authentication',
 	'html-language-features/server',
-	'google-auth-library', // Exclude Google Auth Library to prevent overlapping edits
-
 ];
 
 const skippedExportMangledSymbols = [
@@ -352,15 +335,14 @@ const skippedExportMangledSymbols = [
 class DeclarationData {
 
 	readonly replacementName: string;
-	usageCount: number = 0; // Track the number of times this symbol is used
 
 	constructor(
 		readonly fileName: string,
 		readonly node: ts.FunctionDeclaration | ts.ClassDeclaration | ts.EnumDeclaration | ts.VariableDeclaration,
 		fileIdents: ShortIdent,
 	) {
-		// Placeholder for now - will be set later after counting references
-		this.replacementName = '';
+		// Todo: generate replacement names based on usage count, with more used names getting shorter identifiers
+		this.replacementName = fileIdents.next();
 	}
 
 	getLocations(service: ts.LanguageService): Iterable<{ fileName: string; offset: number }> {
@@ -416,7 +398,6 @@ export class Mangler {
 
 	private readonly allClassDataByKey = new Map<string, ClassData>();
 	private readonly allExportedSymbols = new Set<DeclarationData>();
-	private readonly symbolUsageCounts = new Map<string, number>(); // Map to store symbol usage counts
 
 	private readonly renameWorkerPool: workerpool.WorkerPool;
 
@@ -425,96 +406,11 @@ export class Mangler {
 		private readonly log: typeof console.log = () => { },
 		private readonly config: { readonly manglePrivateFields: boolean; readonly mangleExports: boolean },
 	) {
-		// Check for strict node_modules skip flag from environment
-		const strictNodeModulesSkip = process.env.STRICT_NODE_MODULES_SKIP === 'true';
-		if (strictNodeModulesSkip) {
-			this.log('STRICT_NODE_MODULES_SKIP is enabled - will completely exclude all node_modules files completely');
-		}
 
 		this.renameWorkerPool = workerpool.pool(path.join(__dirname, 'renameWorker.js'), {
-			maxWorkers: 4,
+			maxWorkers: 1,
 			minWorkers: 'max'
 		});
-	}
-
-	private async countSymbolReferences(service: ts.LanguageService): Promise<void> {
-		this.log('Counting symbol references for frequency-based naming');
-
-		type FindRefFn = (projectName: string, fileName: string, pos: number) => ts.ReferencedSymbol[];
-
-		// Process exports first
-		const exportPromises: Array<Promise<void>> = [];
-
-		for (const data of this.allExportedSymbols) {
-			// Skip symbols we don't plan to mangle
-			if (data.fileName.endsWith('.d.ts') ||
-				skippedExportMangledProjects.some(proj => data.fileName.includes(proj)) ||
-				skippedExportMangledFiles.some(file => data.fileName.endsWith(file + '.ts'))) {
-				continue;
-			}
-
-			const currentName = data.node.name!.getText();
-			if (currentName.startsWith('$') || skippedExportMangledSymbols.includes(currentName)) {
-				continue;
-			}
-
-			// Skip functions with @skipMangle annotation
-			if (data.node.getFullText().includes('@skipMangle')) {
-				continue;
-			}
-
-			// Count references for the symbol
-			for (const { fileName, offset } of data.getLocations(service)) {
-				exportPromises.push(
-					Promise.resolve(this.renameWorkerPool.exec<FindRefFn>('findReferences', [this.projectPath, fileName, offset]))
-						.then(refs => {
-							// Count all references as usage
-							let count = 0;
-							for (const ref of refs) {
-								count += ref.references.length;
-							}
-							data.usageCount = Math.max(data.usageCount, count);
-						})
-				);
-			}
-		}
-
-		// Wait for all reference counting to complete
-		await Promise.all(exportPromises);
-
-		// Process class members
-		const classPromises: Array<Promise<void>> = [];
-
-		for (const data of this.allClassDataByKey.values()) {
-			if (hasModifier(data.node, ts.SyntaxKind.DeclareKeyword)) {
-				continue;
-			}
-
-			for (const [name, info] of data.fields) {
-				if (!ClassData._shouldMangle(info.type)) {
-					continue;
-				}
-
-				// Count field references
-				classPromises.push(
-					Promise.resolve(this.renameWorkerPool.exec<FindRefFn>('findReferences', [this.projectPath, data.fileName, info.pos]))
-						.then(refs => {
-							// Store the usage count on the field itself
-							let count = 0;
-							for (const ref of refs) {
-								count += ref.references.length;
-							}
-
-							// Store the count in a new property on data.fields
-							(data.fields.get(name) as any).usageCount = count;
-						})
-				);
-			}
-		}
-
-		await Promise.all(classPromises);
-
-		this.log('Finished counting symbol references');
 	}
 
 	async computeNewFileContents(strictImplicitPublicHandling?: Set<string>): Promise<Map<string, MangleOutput>> {
@@ -528,11 +424,6 @@ export class Mangler {
 		const fileIdents = new ShortIdent('$');
 
 		const visit = (node: ts.Node): void => {
-			// Skip processing any files in node_modules, especially .d.ts files
-			if (node.getSourceFile().fileName.includes('node_modules')) {
-				return;
-			}
-
 			if (this.config.manglePrivateFields) {
 				if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
 					const anchor = node.name ?? node;
@@ -588,13 +479,11 @@ export class Mangler {
 		};
 
 		for (const file of service.getProgram()!.getSourceFiles()) {
-			// Skip any files in node_modules or declaration files
-			if (file.isDeclarationFile || NODE_MODULES_PATTERN.test(file.fileName)) {
-				continue;
+			if (!file.isDeclarationFile) {
+				ts.forEachChild(file, visit);
 			}
-			ts.forEachChild(file, visit);
 		}
-		this.log(`Done collecting all classes. Classes: ${this.allClassDataByKey.size}. Exported symbols: ${this.allExportedSymbols.size}`);
+		this.log(`Done collecting. Classes: ${this.allClassDataByKey.size}. Exported symbols: ${this.allExportedSymbols.size}`);
 
 
 		//  STEP: connect sub and super-types
@@ -656,13 +545,11 @@ export class Mangler {
 			throw new Error(message);
 		}
 
-		// NEW STEP: Count symbol usages before generating replacement names
-		await this.countSymbolReferences(service);
-
 		// STEP: compute replacement names for each class
-		// Instead of using the standard method, use the frequency-based approach
-		this.assignIdentifiersByUsageFrequency();
-		this.log(`Done creating class replacements based on usage frequency`);
+		for (const data of this.allClassDataByKey.values()) {
+			ClassData.fillInReplacement(data);
+		}
+		this.log(`Done creating class replacements`);
 
 		// STEP: prepare rename edits
 		this.log(`Starting prepare rename edits`);
@@ -740,15 +627,7 @@ export class Mangler {
 
 		await Promise.all(renameResults).then((result) => {
 			for (const { newName, locations } of result) {
-				// Filter out any locations that are in node_modules
-				const filteredLocations = locations.filter(loc => !NODE_MODULES_PATTERN.test(loc.fileName));
-
-				// If we filtered out some locations, log it
-				if (filteredLocations.length !== locations.length) {
-					this.log(`Skipped ${locations.length - filteredLocations.length} rename locations in node_modules`);
-				}
-
-				for (const loc of filteredLocations) {
+				for (const loc of locations) {
 					appendRename(newName, loc);
 				}
 			}
@@ -800,101 +679,86 @@ export class Mangler {
 					}
 					lastEdit = edit;
 					const mangledName = characters.splice(edit.offset, edit.length, edit.newText).join('');
-					const line = item.getSourceFile().getLineAndCharacterOfPosition(edit.offset);
-					const mapping: Mapping = {
+					savedBytes += mangledName.length - edit.newText.length;
+
+					// source maps
+					const pos = item.getLineAndCharacterOfPosition(edit.offset);
+
+
+					let mappings = mappingsByLine.get(pos.line);
+					if (!mappings) {
+						mappings = [];
+						mappingsByLine.set(pos.line, mappings);
+					}
+					mappings.unshift({
 						source: relativeFileName,
-						generated: { line: line.line + 1, column: line.character },
-						original: { line: line.line + 1, column: line.character },
-					};
-
-					if (!mappingsByLine.has(line.line)) {
-						mappingsByLine.set(line.line, []);
-					}
-					mappingsByLine.get(line.line)!.push(mapping);
+						original: { line: pos.line + 1, column: pos.character },
+						generated: { line: pos.line + 1, column: pos.character },
+						name: mangledName
+					}, {
+						source: relativeFileName,
+						original: { line: pos.line + 1, column: pos.character + edit.length },
+						generated: { line: pos.line + 1, column: pos.character + edit.newText.length },
+					});
 				}
 
-				// generate source map
-				generator = new SourceMapGenerator({
-					file: path.basename(item.fileName),
-					sourceRoot: sourceMapRoot,
-				});
-				for (const [line, mappings] of mappingsByLine) {
+				// source map generation, make sure to get mappings per line correct
+				generator = new SourceMapGenerator({ file: path.basename(item.fileName), sourceRoot: sourceMapRoot });
+				generator.setSourceContent(relativeFileName, item.getFullText());
+				for (const [, mappings] of mappingsByLine) {
+					let lineDelta = 0;
 					for (const mapping of mappings) {
-						generator.addMapping(mapping);
+						generator.addMapping({
+							...mapping,
+							generated: { line: mapping.generated.line, column: mapping.generated.column - lineDelta }
+						});
+						lineDelta += mapping.original.column - mapping.generated.column;
 					}
 				}
-
-				// NOTE: this might not be necessary anymore with the latest source-map package
-				generator._file = path.basename(item.fileName);
-				generator._sourceRoot = sourceMapRoot;
 
 				newFullText = characters.join('');
 			}
-
-			// strip BOM
-			if (newFullText.startsWith('\uFEFF')) {
-				newFullText = newFullText.slice(1);
-			}
-
-			result.set(item.fileName, {
-				out: newFullText,
-				sourceMap: generator ? generator.toString() : undefined
-			});
-
-			// update file content
-			// await fs.promises.writeFile(item.fileName, newFullText);
+			result.set(item.fileName, { out: newFullText, sourceMap: generator?.toString() });
 		}
 
+		service.dispose();
+		this.renameWorkerPool.terminate();
+
+		this.log(`Done: ${savedBytes / 1000}kb saved, memory-usage: ${JSON.stringify(v8.getHeapStatistics())}`);
 		return result;
-	}
-
-	private assignIdentifiersByUsageFrequency() {
-		this.log('Assigning short identifiers based on usage frequency');
-
-		// For exported symbols
-		const exportedArray = Array.from(this.allExportedSymbols);
-		// Sort by usage count in descending order (most used first)
-		exportedArray.sort((a, b) => b.usageCount - a.usageCount);
-
-		// Assign short identifiers to exports in order of usage frequency
-		const exportIdents = new ShortIdent('$');
-		for (const data of exportedArray) {
-			// Skip symbols that won't be mangled
-			if (data.fileName.endsWith('.d.ts') ||
-				skippedExportMangledProjects.some(proj => data.fileName.includes(proj)) ||
-				skippedExportMangledFiles.some(file => data.fileName.endsWith(file + '.ts'))) {
-				continue;
-			}
-
-			const currentName = data.node.name!.getText();
-			if (currentName.startsWith('$') || skippedExportMangledSymbols.includes(currentName)) {
-				continue;
-			}
-
-			if (data.node.getFullText().includes('@skipMangle')) {
-				continue;
-			}
-
-			// Assign the next available short identifier
-			const newName = exportIdents.next(name => isNameTakenInFile(data.node, name));
-			// Only set it if it's shorter than original
-			if (newName.length < currentName.length) {
-				(data as any).replacementName = newName;
-				this.log(`Assigning ${newName} to ${currentName} (used ${data.usageCount} times)`);
-			}
-		}
-
-		// For class fields/methods, modify the ClassData.fillInReplacement method to use usage counts
-		this.log('Finished assigning identifiers based on usage frequency');
 	}
 }
 
+// --- ast utils
+
+function hasModifier(node: ts.Node, kind: ts.SyntaxKind) {
+	const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+	return Boolean(modifiers?.find(mode => mode.kind === kind));
+}
+
+function isInAmbientContext(node: ts.Node): boolean {
+	for (let p = node.parent; p; p = p.parent) {
+		if (ts.isModuleDeclaration(p)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function normalize(path: string): string {
+	return path.replace(/\\/g, '/');
+}
+
 async function _run() {
+	const root = path.join(__dirname, '..', '..', '..');
+	const projectBase = path.join(root, 'src');
+	const projectPath = path.join(projectBase, 'tsconfig.json');
+	const newProjectBase = path.join(path.dirname(projectBase), path.basename(projectBase) + '2');
 
-	const projectBase = path.resolve(argv[2]);
-	const newProjectBase = path.resolve(argv[3]);
+	fs.cpSync(projectBase, newProjectBase, { recursive: true });
 
-	const mangler = new Mangler(projectBase, console.log, {
+	const mangler = new Mangler(projectPath, console.log, {
+		mangleExports: true,
 		manglePrivateFields: true,
 	});
 	for (const [fileName, contents] of await mangler.computeNewFileContents(new Set(['saveState']))) {
