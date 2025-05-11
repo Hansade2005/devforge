@@ -15,6 +15,5 @@ function clean() {
 
 gulp.task('clean', clean);
 require('./build/gulpfile');
-const gulp = require('gulp');
 const _compileTask = require('./build/gulpfile')._compileTask;
 gulp.task('default', gulp.series('clean', _compileTask));
